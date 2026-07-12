@@ -1,0 +1,147 @@
+{
+  "entryType": "UniProtKB reviewed (Swiss-Prot)",
+  "primaryAccession": "P04637",
+  "secondaryAccessions": ["Q15086", "Q15087"],
+  "uniProtkbId": "P53_HUMAN",
+  "entryAudit": {
+    "firstPublicDate": "1987-08-13",
+    "lastAnnotationUpdateDate": "2024-01-24",
+    "lastSequenceUpdateDate": "1997-02-01",
+    "entryVersion": 250,
+    "sequenceVersion": 4
+  },
+  "annotationScore": 5.0,
+  "organism": {
+    "scientificName": "Homo sapiens",
+    "commonName": "Human",
+    "taxonId": 9606,
+    "lineage": ["Eukaryota", "Metazoa", "Chordata"]
+  },
+  "proteinExistence": "1: Evidence at protein level",
+  "proteinDescription": {
+    "recommendedName": {
+      "fullName": {
+        "value": "Cellular tumor antigen p53",
+        "evidences": [{"evidenceCode": "ECO:0000269", "source": "PubMed", "id": "3938197"}]
+      }
+    },
+    "alternativeNames": [
+      {"fullName": {"value": "Antigen NY-CO-13"}},
+      {"fullName": {"value": "Phosphoprotein p53"}},
+      {"shortNames": [{"value": "p53"}]}
+    ],
+    "submissionNames": [{"fullName": {"value": "Tumor suppressor p53"}}]
+  },
+  "genes": [
+    {
+      "geneName": {"value": "TP53", "evidences": [{"evidenceCode": "ECO:0000312", "source": "HGNC", "id": "HGNC:11998"}]},
+      "synonyms": [{"value": "P53"}, {"value": "BCC7"}],
+      "orderedLocusNames": [{"value": "LFS1"}],
+      "orfNames": [{"value": "TRP53"}]
+    },
+    {
+      "geneName": {"value": "TP53-AS1"},
+      "synonyms": [{"value": "WRAP53"}]
+    }
+  ],
+  "comments": [
+    {
+      "commentType": "FUNCTION",
+      "texts": [{"value": "Acts as a tumor suppressor in many tumor types.", "evidences": [{"evidenceCode": "ECO:0000269", "source": "PubMed", "id": "21738229"}]}]
+    },
+    {
+      "commentType": "SUBCELLULAR LOCATION",
+      "subcellularLocations": [{
+        "location": {"value": "Nucleus", "id": "SL-0191"},
+        "topology": {"value": "Peripheral membrane protein"},
+        "evidences": [{"evidenceCode": "ECO:0000250", "source": "UniProtKB", "id": "P02340"}]
+      }]
+    },
+    {
+      "commentType": "ALTERNATIVE PRODUCTS",
+      "events": ["Alternative splicing", "Alternative initiation"],
+      "isoforms": [
+        {
+          "name": {"value": "1"},
+          "isoformIds": ["P04637-1"],
+          "isoformSequenceStatus": "Displayed"
+        },
+        {
+          "name": {"value": "2"},
+          "synonyms": [{"value": "p53-beta"}],
+          "isoformIds": ["P04637-2"],
+          "isoformSequenceStatus": "Described",
+          "sequenceIds": ["VSP_039514"]
+        }
+      ]
+    },
+    {
+      "commentType": "INTERACTION",
+      "interactions": [{"interactantOne": {"uniProtKBAccession": "P04637"}, "interactantTwo": {"uniProtKBAccession": "Q00987", "geneName": "MDM2"}, "numberOfExperiments": 31}]
+    }
+  ],
+  "features": [
+    {
+      "type": "Domain",
+      "location": {"start": {"value": 102, "modifier": "EXACT"}, "end": {"value": 292, "modifier": "EXACT"}},
+      "description": "DNA-binding",
+      "featureId": "PRO_0000185703",
+      "evidences": [{"evidenceCode": "ECO:0000255", "source": "PROSITE-ProRule", "id": "PRU10133"}]
+    },
+    {
+      "type": "Mutagenesis",
+      "location": {"start": {"value": 175, "modifier": "EXACT"}, "end": {"value": 175, "modifier": "EXACT"}},
+      "description": "R->H: Loss of DNA binding.",
+      "alternativeSequence": {"originalSequence": "R", "alternativeSequences": ["H", "C"]},
+      "evidences": [{"evidenceCode": "ECO:0000269", "source": "PubMed", "id": "1565144"}]
+    },
+    {
+      "type": "Alternative sequence",
+      "location": {"start": {"value": 332, "modifier": "EXACT"}, "end": {"value": 341, "modifier": "EXACT"}},
+      "description": "In isoform 2.",
+      "featureId": "VSP_039514",
+      "alternativeSequence": {"originalSequence": "KKGEPHHELP", "alternativeSequences": ["DIEQWFTEDP"]}
+    },
+    {
+      "type": "Binding site",
+      "location": {"start": {"value": 176, "modifier": "EXACT"}, "end": {"value": 176, "modifier": "EXACT"}},
+      "ligand": {"name": "zinc", "id": "ChEBI:29105", "label": "1"},
+      "ligandPart": {"name": "coordination site"}
+    }
+  ],
+  "uniProtKBCrossReferences": [
+    {
+      "database": "PDB",
+      "id": "1TUP",
+      "properties": [{"key": "Method", "value": "X-ray"}, {"key": "Resolution", "value": "2.20 A"}, {"key": "Chains", "value": "A/B/C=94-312"}],
+      "evidences": [{"evidenceCode": "ECO:0006220"}]
+    },
+    {
+      "database": "Ensembl",
+      "id": "ENST00000269305.9",
+      "properties": [{"key": "ProteinId", "value": "ENSP00000269305.4"}, {"key": "GeneId", "value": "ENSG00000141510.19"}],
+      "isoformId": "P04637-1"
+    }
+  ],
+  "keywords": [
+    {"id": "KW-0045", "category": "Biological process", "name": "Apoptosis"},
+    {"id": "KW-1185", "category": "Technical term", "name": "Reference proteome"}
+  ],
+  "references": [{
+    "citation": {"id": "3938197", "citationType": "journal article", "title": "The cellular tumour antigen p53.", "authors": ["Matlashewski G."]},
+    "referencePositions": ["NUCLEOTIDE SEQUENCE"],
+    "referenceComments": [{"value": "K562 cell line", "type": "STRAIN"}]
+  }],
+  "sequence": {
+    "value": "MEEPQSDPSVEPPLSQETFSDLWKLLPENNVLSPLPSQAMDDLMLSPDDIEQWFTEDPGPDEAPRMPEAAPPVAPAPAAPTPAAPAPAPSWPLSSSVPSQKTYQGSYGFRLGFLHSGTAKSVTCTYSPALNKMFCQLAKTCPVQLWVDSTPPPGTRVRAMAIYKQSQHMTEVVRRCPHHERCSDSDGLAPPQHLIRVEGNLRVEYLDDRNTFRHSVVVPYEPPEVGSDCTTIHYNYMCNSSCMGGMNRRPILTIITLEDSSGNLLGRNSFEVRVCACPGRDRRTEEENLRKKGEPHHELPPGSTKRALPNNTSSSPQPKKKPLDGEYFTLQIRGRERFEMFRELNEALELKDAQAGKEPGGSRAHSSHLKSKKGQSTSRHKKLMFKTEGPDSD",
+    "length": 393,
+    "molWeight": 43653,
+    "crc64": "AD5C149FD8106131",
+    "md5": "C62A39FBD2D09837B3BF227B69F95D8D"
+  },
+  "extraAttributes": {"uniParcId": "UPI000002ED67"},
+  "futureSchemaField": {
+    "variant": "preserve-me",
+    "nested": [{"flag": true, "nullable": null, "score": 0.125}]
+  }
+}

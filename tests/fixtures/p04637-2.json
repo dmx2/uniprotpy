@@ -1,0 +1,26 @@
+{
+  "entryType": "UniProtKB reviewed (Swiss-Prot)",
+  "primaryAccession": "P04637-2",
+  "uniProtkbId": "P53_HUMAN",
+  "entryAudit": {
+    "firstPublicDate": "1987-08-13",
+    "lastAnnotationUpdateDate": "2024-01-24",
+    "lastSequenceUpdateDate": "2009-09-22",
+    "entryVersion": 31,
+    "sequenceVersion": 1
+  },
+  "proteinDescription": {
+    "recommendedName": {"fullName": {"value": "Cellular tumor antigen p53"}},
+    "alternativeNames": [{"fullName": {"value": "Cellular tumor antigen p53 isoform beta"}}]
+  },
+  "genes": [{"geneName": {"value": "TP53"}, "synonyms": [{"value": "P53"}]}],
+  "organism": {"scientificName": "Homo sapiens", "taxonId": 9606},
+  "proteinExistence": "1: Evidence at protein level",
+  "sequence": {
+    "value": "MEEPQSDPSVEPPLSQETFSDLWKLLPENNVLSPLPSQAMDDLMLSPDDIEQWFTEDP",
+    "length": 60,
+    "molWeight": 6900,
+    "crc64": "0123456789ABCDEF"
+  },
+  "futureIsoformProjection": {"preserve": ["unknown", 2]}
+}
