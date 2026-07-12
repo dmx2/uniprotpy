@@ -1,0 +1,70 @@
+{
+  "id": "UP000005640",
+  "taxonomy": {
+    "scientificName": "Homo sapiens",
+    "commonName": "Human",
+    "taxonId": 9606,
+    "mnemonic": "HUMAN"
+  },
+  "modified": "2025-12-05",
+  "proteomeType": "Reference proteome",
+  "components": [
+    {
+      "name": "Chromosome 1",
+      "proteinCount": 13926,
+      "genomeAnnotation": {
+        "source": "Ensembl"
+      },
+      "proteomeCrossReferences": [
+        {
+          "database": "GenomeAccession",
+          "id": "CM000663"
+        }
+      ]
+    }
+  ],
+  "annotationScore": 3,
+  "superkingdom": "eukaryota",
+  "proteomeCompletenessReport": {
+    "buscoReport": {
+      "complete": 13716,
+      "completeSingle": 5103,
+      "completeDuplicated": 8613,
+      "fragmented": 5,
+      "missing": 59,
+      "total": 13780,
+      "lineageDb": "primates_odb10",
+      "score": 99
+    },
+    "cpdReport": {
+      "proteomeCount": 0,
+      "stdCdss": 0,
+      "averageCdss": 0,
+      "confidence": 0,
+      "status": "Unknown"
+    }
+  },
+  "genomeAssembly": {
+    "assemblyId": "GCA_000001405.29",
+    "genomeAssemblyUrl": "https://www.ebi.ac.uk/ena/browser/view/GCA_000001405.29",
+    "level": "full",
+    "source": "Ensembl"
+  },
+  "geneCount": 20652,
+  "proteinCount": 147506,
+  "genomeAnnotation": {
+    "source": "Ensembl",
+    "url": "https://www.ensembl.org/Homo_sapiens"
+  },
+  "taxonLineage": [
+    {
+      "scientificName": "Hominidae",
+      "taxonId": 9604,
+      "rank": "family"
+    }
+  ],
+  "futureProteomeField": {
+    "variant": "preserve-me",
+    "evidence": ["ECO:0000269"]
+  }
+}

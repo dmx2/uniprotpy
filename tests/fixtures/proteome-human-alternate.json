@@ -1,0 +1,32 @@
+{
+  "id": "UP000999901",
+  "taxonomy": {
+    "scientificName": "Homo sapiens",
+    "commonName": "Human",
+    "taxonId": 9606,
+    "mnemonic": "HUMAN_ALT"
+  },
+  "modified": "2025-12-05",
+  "proteomeType": "Reference proteome",
+  "components": [
+    {
+      "name": "Primary assembly",
+      "proteinCount": 82000
+    }
+  ],
+  "annotationScore": 5,
+  "proteomeCompletenessReport": {
+    "buscoReport": {
+      "complete": 13642,
+      "completeSingle": 10000,
+      "completeDuplicated": 3642,
+      "fragmented": 20,
+      "missing": 118,
+      "total": 13780,
+      "lineageDb": "primates_odb10",
+      "score": 99
+    }
+  },
+  "geneCount": 20500,
+  "proteinCount": 82000
+}

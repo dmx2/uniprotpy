@@ -14,6 +14,7 @@ import requests
 from requests.adapters import HTTPAdapter
 
 from .models import UniProtEntry
+from .proteomes import Proteome
 
 
 _DEFAULT_BASE_URL = "https://rest.uniprot.org"
@@ -62,6 +63,23 @@ class EntryPage:
   @property
   def results(self) -> Tuple[UniProtEntry, ...]:
     return self.entries
+
+
+@dataclass(frozen=True)
+class ProteomeResponse:
+  proteome: Proteome
+  metadata: ResponseMetadata
+
+
+@dataclass(frozen=True)
+class ProteomePage:
+  proteomes: Tuple[Proteome, ...]
+  metadata: ResponseMetadata
+  next_url: Optional[str]
+
+  @property
+  def results(self) -> Tuple[Proteome, ...]:
+    return self.proteomes
 
 
 class UniProtError(RuntimeError):
@@ -222,6 +240,90 @@ class UniProtClient:
       if page.next_url is None:
         return
       page = self.get_search_page(url=page.next_url)
+
+  def get_proteome(self, upid: str) -> ProteomeResponse:
+    """Retrieve a faithful proteome JSON document and response metadata."""
+    if not isinstance(upid, str) or not upid.strip():
+      raise ValueError("upid must not be empty")
+    url = "{}/proteomes/{}".format(
+      self.base_url, quote(upid.strip(), safe="")
+    )
+    response = self._get(url, params={"format": "json"})
+    data = self._json_object(response, "proteome")
+    return ProteomeResponse(Proteome.from_json(data), self._metadata(response))
+
+  def get_proteome_search_page(
+    self,
+    query: Optional[str] = None,
+    *,
+    size: int = 500,
+    url: Optional[str] = None,
+  ) -> ProteomePage:
+    """Fetch one proteome-search page or follow an opaque cursor URL."""
+    if url is not None:
+      response = self._get(url)
+    else:
+      if query is None or not query.strip():
+        raise ValueError("query must not be empty")
+      if size < 1 or size > 500:
+        raise ValueError("size must be between 1 and 500")
+      response = self._get(
+        self.base_url + "/proteomes/search",
+        params={"query": query, "format": "json", "size": str(size)},
+      )
+    payload = self._json_object(response, "proteome search page")
+    results = payload.get("results")
+    if not isinstance(results, list):
+      raise UniProtResponseError(
+        "UniProt proteome search response from {} has no results list".format(
+          response.url
+        )
+      )
+    proteomes = []
+    for index, result in enumerate(results):
+      if not isinstance(result, Mapping):
+        raise UniProtResponseError(
+          "UniProt proteome search result {} from {} is not an object".format(
+            index, response.url
+          )
+        )
+      proteomes.append(Proteome.from_json(result))
+    return ProteomePage(
+      tuple(proteomes), self._metadata(response), self._next_url(response)
+    )
+
+  def search_proteomes(
+    self, query: str, *, size: int = 500
+  ) -> Iterator[ProteomePage]:
+    """Yield every cursor-paginated proteome search page."""
+    page = self.get_proteome_search_page(query, size=size)
+    while True:
+      yield page
+      if page.next_url is None:
+        return
+      page = self.get_proteome_search_page(url=page.next_url)
+
+  def reference_proteomes(
+    self, taxon_id: int, scope: str = "lineage", *, size: int = 500
+  ) -> Tuple[Proteome, ...]:
+    """Return reference proteomes for a taxon, optionally filtering exactly.
+
+    UniProt's ``taxonomy_id`` query includes descendants. ``scope='exact'``
+    therefore performs an explicit client-side taxon-ID filter; lineage scope
+    preserves all server-returned descendants.
+    """
+    if isinstance(taxon_id, bool) or not isinstance(taxon_id, int) or taxon_id < 1:
+      raise ValueError("taxon_id must be a positive integer")
+    if scope not in ("exact", "lineage"):
+      raise ValueError("scope must be 'exact' or 'lineage'")
+    query = "(taxonomy_id:{}) AND (proteome_type:REFERENCE)".format(taxon_id)
+    proteomes = tuple(
+      proteome
+      for page in self.search_proteomes(query, size=size)
+      for proteome in page.proteomes
+      if scope == "lineage" or proteome.taxon_id == taxon_id
+    )
+    return proteomes
 
   def _entry_url(self, accession: str, format: str) -> str:
     if not isinstance(accession, str) or not accession.strip():

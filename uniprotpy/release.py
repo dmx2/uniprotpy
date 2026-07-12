@@ -164,6 +164,85 @@ class UniProtRelease:
     )
     return store.add_all(response.entry for response in responses)
 
+  def install_proteome(self, upid: str) -> int:
+    """Install all UniProtKB entries belonging to one validated proteome.
+
+    Entries are fetched through the cursor-paginated UniProtKB search endpoint
+    and committed in page-sized atomic batches with explicit membership and
+    release provenance. No direct per-entry requests are made.
+    """
+    if not isinstance(upid, str) or not upid.strip():
+      raise ValueError("upid must be a nonempty string")
+    upid = upid.strip()
+    metadata_response = self.client.get_proteome(upid)
+    proteome = metadata_response.proteome
+    if proteome.upid != upid:
+      raise ValueError(
+        "proteome response ID {!r} does not match requested {!r}".format(
+          proteome.upid, upid
+        )
+      )
+    if proteome.taxon_id is None:
+      raise ValueError("proteome response is missing a valid taxonomy taxonId")
+    self._validate_observed_release(metadata_response.metadata.release)
+
+    query = "proteome:{}".format(upid)
+    store = self.store
+    store.clear_proteome_membership(upid)
+    provenance = {
+      "install_method": "proteome_search",
+      "proteome_id": upid,
+      "proteome_taxon_id": proteome.taxon_id,
+      "proteome": proteome.to_dict(),
+      "entry_count": 0,
+    }
+    store.set_release_metadata(
+      requested_release=self.release,
+      observed_release=metadata_response.metadata.release,
+      observed_release_date=metadata_response.metadata.release_date,
+      source_url=metadata_response.metadata.url,
+      source_query=query,
+      source_format="json",
+      fetched_at=datetime.now(timezone.utc),
+      complete=False,
+      next_page_url=None,
+      provenance=provenance,
+    )
+
+    count = 0
+    observed_release = metadata_response.metadata.release
+    observed_date = metadata_response.metadata.release_date
+    source_url = metadata_response.metadata.url
+    for page in self.client.search_entries(query, size=500):
+      self._validate_observed_release(page.metadata.release)
+      if observed_release is None:
+        observed_release = page.metadata.release
+      elif page.metadata.release != observed_release:
+        raise ReleaseMismatchError(self.release, page.metadata.release)
+      if observed_date is None:
+        observed_date = page.metadata.release_date
+      source_url = page.metadata.url
+      count += store.add_proteome_entries(upid, page.entries)
+      provenance["entry_count"] = count
+      store.set_release_metadata(
+        observed_release=observed_release,
+        observed_release_date=observed_date,
+        source_url=source_url,
+        next_page_url=page.next_url,
+        complete=page.next_url is None,
+        provenance=provenance,
+      )
+
+    store.set_release_metadata(
+      observed_release=observed_release,
+      observed_release_date=observed_date,
+      source_url=source_url,
+      next_page_url=None,
+      complete=True,
+      provenance=provenance,
+    )
+    return count
+
   def entry(self, accession: str) -> Any:
     return self.store.get(accession)
 

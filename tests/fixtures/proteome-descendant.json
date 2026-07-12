@@ -1,0 +1,37 @@
+{
+  "id": "UP000999902",
+  "taxonomy": {
+    "scientificName": "Homo sapiens strain descendant",
+    "taxonId": 63221,
+    "mnemonic": "HUMAN_DESC"
+  },
+  "modified": "2025-12-05",
+  "proteomeType": "Reference proteome",
+  "components": [
+    {
+      "name": "Genome",
+      "proteinCount": 90000
+    }
+  ],
+  "proteomeCompletenessReport": {
+    "buscoReport": {
+      "complete": 13750,
+      "completeSingle": 10000,
+      "completeDuplicated": 3750,
+      "fragmented": 5,
+      "missing": 25,
+      "total": 13780,
+      "lineageDb": "primates_odb10",
+      "score": 99.8
+    }
+  },
+  "geneCount": 21000,
+  "proteinCount": 90000,
+  "taxonLineage": [
+    {
+      "scientificName": "Homo sapiens",
+      "taxonId": 9606,
+      "rank": "species"
+    }
+  ]
+}

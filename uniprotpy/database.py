@@ -100,6 +100,23 @@ class _GeneNameRow(_StoreBase):
   )
 
 
+class _ProteomeMembershipRow(_StoreBase):
+  __tablename__ = "entry_proteomes"
+
+  dataset_id: Mapped[int] = mapped_column(Integer, primary_key=True)
+  accession: Mapped[str] = mapped_column(String, primary_key=True)
+  upid: Mapped[str] = mapped_column(String, primary_key=True, index=True)
+
+  __table_args__ = (
+    ForeignKeyConstraint(
+      ["dataset_id", "accession"],
+      ["entries.dataset_id", "entries.accession"],
+      ondelete="CASCADE",
+    ),
+    Index("ix_entry_proteomes_dataset_upid", "dataset_id", "upid"),
+  )
+
+
 def _database_url(value: Optional[Union[str, Path, URL]]) -> Union[str, URL]:
   if isinstance(value, URL):
     return value
@@ -400,7 +417,13 @@ class UniProtStore:
     self.add_all([entry])
     return _domain_entry(_entry_mapping(entry))
 
-  def add_all(self, entries: Iterable[Any]) -> int:
+  def add_all(
+    self, entries: Iterable[Any], *, proteome_id: Optional[str] = None
+  ) -> int:
+    if proteome_id is not None and (
+      not isinstance(proteome_id, str) or not proteome_id
+    ):
+      raise ValueError("proteome_id must be a nonempty string")
     prepared: list[tuple[dict[str, Any], dict[str, Any], list[tuple[str, str, int]]]] = []
     for entry in entries:
       raw = _entry_mapping(entry)
@@ -442,10 +465,64 @@ class UniProtStore:
               "ordinal": ordinal,
             } for name, kind, ordinal in names],
           )
+        if proteome_id is not None:
+          session.execute(
+            sqlite_insert(_ProteomeMembershipRow).values(
+              dataset_id=dataset_id,
+              accession=projections["accession"],
+              upid=proteome_id,
+            ).on_conflict_do_nothing()
+          )
     return len(prepared)
 
   batch_add = add_all
   upsert = add
+
+  def add_proteome_entries(self, upid: str, entries: Iterable[Any]) -> int:
+    """Atomically upsert one batch of entries and their proteome membership."""
+    return self.add_all(entries, proteome_id=upid)
+
+  def clear_proteome_membership(self, upid: str) -> None:
+    if not isinstance(upid, str) or not upid:
+      raise ValueError("upid must be a nonempty string")
+    with self.session.begin() as session:
+      dataset_id = self._dataset_id(session)
+      session.execute(
+        delete(_ProteomeMembershipRow).where(
+          _ProteomeMembershipRow.dataset_id == dataset_id,
+          _ProteomeMembershipRow.upid == upid,
+        )
+      )
+
+  def proteome_accessions(self, upid: str) -> list[str]:
+    with self.session() as session:
+      dataset_id = self._dataset_id(session)
+      return list(session.scalars(
+        select(_ProteomeMembershipRow.accession)
+        .where(
+          _ProteomeMembershipRow.dataset_id == dataset_id,
+          _ProteomeMembershipRow.upid == upid,
+        )
+        .order_by(_ProteomeMembershipRow.accession)
+      ))
+
+  def entries_for_proteome(self, upid: str) -> list[Any]:
+    with self.session() as session:
+      dataset_id = self._dataset_id(session)
+      rows = session.scalars(
+        select(_EntryRow.raw_json)
+        .join(
+          _ProteomeMembershipRow,
+          (_ProteomeMembershipRow.dataset_id == _EntryRow.dataset_id)
+          & (_ProteomeMembershipRow.accession == _EntryRow.accession),
+        )
+        .where(
+          _ProteomeMembershipRow.dataset_id == dataset_id,
+          _ProteomeMembershipRow.upid == upid,
+        )
+        .order_by(_EntryRow.accession)
+      ).all()
+    return [_domain_entry(raw) for raw in rows]
 
   def get(self, accession: str) -> Optional[Any]:
     with self.session() as session:
