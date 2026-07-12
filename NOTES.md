@@ -156,7 +156,10 @@ Live API checks are smoke tests only; deterministic tests use captured fixtures 
 ## Milestones
 
 - Design checkpoint: complete. Research and UniProt-native architecture recorded here.
+- Entry pipeline: complete in `b68d9c5` and `bc50a60`. Includes JSON/FASTA retrieval, lossless accessors, polite retries/pagination, release-aware SQLite, indexed accession/gene/name queries, and an environment-overridable release cache.
+- Proteome pipeline: complete in `c4df80f`. Includes faithful proteome metadata, exact/lineage reference discovery, typed ambiguity-preserving selection, and cursor-paginated bulk install with membership/provenance.
+- Verification: 21 focused offline tests pass. A live `P04637` JSON/FASTA fetch round-tripped through SQLite with a successful `TP53` lookup; live `UP000005640` metadata returned taxon 9606 and BUSCO 99.0 on release `2026_02`.
 
 ## Next step
 
-Implement the vertical per-entry path first: central polite client -> faithful `UniProtEntry` parser/accessors -> release-aware SQLite round-trip and indexed accession/gene/name queries -> focused tests. Only then migrate proteome retrieval onto those layers.
+Implement the redesigned CLI over the shipped `UniProtClient` and `UniProtRelease` APIs: entry fetch, entry/proteome install, cached query, and faithful JSON/FASTA/field-selected TSV output. Then add taxonomy domain objects and the asynchronous ID-Mapping submit/poll/paginated-results flow already researched above.
