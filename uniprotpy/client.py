@@ -26,6 +26,7 @@ from .idmapping import (
 from .models import UniProtEntry
 from .proteomes import Proteome
 from .taxonomy import Taxon
+from .uniparc import UniParcCrossReference, UniParcEntry
 
 
 _DEFAULT_BASE_URL = "https://rest.uniprot.org"
@@ -109,6 +110,33 @@ class TaxonPage:
   @property
   def results(self) -> Tuple[Taxon, ...]:
     return self.taxa
+
+@dataclass(frozen=True)
+class UniParcEntryResponse:
+  entry: UniParcEntry
+  metadata: ResponseMetadata
+
+
+@dataclass(frozen=True)
+class UniParcEntryPage:
+  entries: Tuple[UniParcEntry, ...]
+  metadata: ResponseMetadata
+  next_url: Optional[str]
+
+  @property
+  def results(self) -> Tuple[UniParcEntry, ...]:
+    return self.entries
+
+
+@dataclass(frozen=True)
+class UniParcCrossReferencePage:
+  cross_references: Tuple[UniParcCrossReference, ...]
+  metadata: ResponseMetadata
+  next_url: Optional[str]
+
+  @property
+  def results(self) -> Tuple[UniParcCrossReference, ...]:
+    return self.cross_references
 
 
 class UniProtError(RuntimeError):
@@ -334,6 +362,193 @@ class UniProtClient:
       if page.next_url is None:
         return
       page = self.get_proteome_search_page(url=page.next_url)
+
+  def get_uniparc_entry(
+    self,
+    upi: str,
+    *,
+    fields: Optional[str] = None,
+    db_types: Optional[Iterable[str]] = None,
+    active: Optional[bool] = None,
+    taxon_ids: Optional[Iterable[int]] = None,
+  ) -> UniParcEntryResponse:
+    """Retrieve one full, faithful UniParc record."""
+    url = self._uniparc_url(upi)
+    params = self._uniparc_reference_params(
+      db_types=db_types, active=active, taxon_ids=taxon_ids
+    )
+    params["format"] = "json"
+    if fields is not None:
+      params["fields"] = fields
+    response = self._get(url, params=params)
+    data = self._json_object(response, "UniParc entry")
+    return UniParcEntryResponse(UniParcEntry.from_json(data), self._metadata(response))
+
+  def get_uniparc_entry_light(
+    self, upi: str, *, fields: Optional[str] = None
+  ) -> UniParcEntryResponse:
+    """Retrieve the smaller search-style projection for one UPI."""
+    url = self._uniparc_url(upi) + "/light"
+    params = {"format": "json"}
+    if fields is not None:
+      params["fields"] = fields
+    response = self._get(url, params=params)
+    data = self._json_object(response, "light UniParc entry")
+    return UniParcEntryResponse(UniParcEntry.from_json(data), self._metadata(response))
+
+  def get_uniparc_entry_text(
+    self, upi: str, format: str = "fasta"
+  ) -> TextResponse:
+    """Retrieve a textual UniParc representation such as FASTA."""
+    if not isinstance(format, str) or _FORMAT.fullmatch(format) is None:
+      raise ValueError("format must contain only letters and digits")
+    response = self._get(
+      self._uniparc_url(upi), params={"format": format.lower()}
+    )
+    return TextResponse(response.text, self._metadata(response))
+
+  def get_uniparc_search_page(
+    self,
+    query: Optional[str] = None,
+    *,
+    size: int = 500,
+    fields: Optional[str] = None,
+    sort: Optional[str] = None,
+    url: Optional[str] = None,
+  ) -> UniParcEntryPage:
+    """Fetch one UniParc query page or follow an opaque cursor URL."""
+    if url is not None:
+      response = self._get(url)
+    else:
+      if not isinstance(query, str) or not query.strip():
+        raise ValueError("query must be a nonempty string")
+      if isinstance(size, bool) or not isinstance(size, int) or not 1 <= size <= 500:
+        raise ValueError("size must be between 1 and 500")
+      params = {"query": query, "format": "json", "size": str(size)}
+      if fields is not None:
+        params["fields"] = fields
+      if sort is not None:
+        params["sort"] = sort
+      response = self._get(self.base_url + "/uniparc/search", params=params)
+    payload = self._json_object(response, "UniParc search page")
+    results = payload.get("results")
+    if not isinstance(results, list):
+      raise UniProtResponseError(
+        "UniProt UniParc search response from {} has no results list".format(
+          response.url
+        )
+      )
+    entries = []
+    for index, result in enumerate(results):
+      if not isinstance(result, Mapping):
+        raise UniProtResponseError(
+          "UniProt UniParc result {} from {} is not an object".format(
+            index, response.url
+          )
+        )
+      entries.append(UniParcEntry.from_json(result))
+    return UniParcEntryPage(
+      tuple(entries), self._metadata(response), self._next_url(response)
+    )
+
+  def search_uniparc_entries(
+    self,
+    query: str,
+    *,
+    size: int = 500,
+    fields: Optional[str] = None,
+    sort: Optional[str] = None,
+  ) -> Iterator[UniParcEntryPage]:
+    """Yield every cursor-paginated UniParc query page."""
+    page = self.get_uniparc_search_page(
+      query, size=size, fields=fields, sort=sort
+    )
+    while True:
+      yield page
+      if page.next_url is None:
+        return
+      page = self.get_uniparc_search_page(url=page.next_url)
+
+  def get_uniparc_cross_reference_page(
+    self,
+    upi: Optional[str] = None,
+    *,
+    identifier: Optional[str] = None,
+    size: int = 500,
+    fields: Optional[str] = None,
+    db_types: Optional[Iterable[str]] = None,
+    active: Optional[bool] = None,
+    taxon_ids: Optional[Iterable[int]] = None,
+    url: Optional[str] = None,
+  ) -> UniParcCrossReferencePage:
+    """Fetch one page of heterogeneous database references for a UPI."""
+    if url is not None:
+      response = self._get(url)
+    else:
+      if upi is None:
+        raise ValueError("upi is required when url is not supplied")
+      if isinstance(size, bool) or not isinstance(size, int) or not 1 <= size <= 500:
+        raise ValueError("size must be between 1 and 500")
+      params = self._uniparc_reference_params(
+        db_types=db_types, active=active, taxon_ids=taxon_ids
+      )
+      params.update({"format": "json", "size": str(size)})
+      if identifier is not None:
+        if not isinstance(identifier, str) or not identifier:
+          raise ValueError("identifier must be a nonempty string")
+        params["id"] = identifier
+      if fields is not None:
+        params["fields"] = fields
+      response = self._get(
+        self._uniparc_url(upi) + "/databases", params=params
+      )
+    payload = self._json_object(response, "UniParc cross-reference page")
+    results = payload.get("results")
+    if not isinstance(results, list):
+      raise UniProtResponseError(
+        "UniProt UniParc cross-reference response from {} has no results list".format(
+          response.url
+        )
+      )
+    references = []
+    for index, result in enumerate(results):
+      if not isinstance(result, Mapping):
+        raise UniProtResponseError(
+          "UniProt UniParc cross-reference {} from {} is not an object".format(
+            index, response.url
+          )
+        )
+      references.append(UniParcCrossReference.from_json(result))
+    return UniParcCrossReferencePage(
+      tuple(references), self._metadata(response), self._next_url(response)
+    )
+
+  def uniparc_cross_references(
+    self,
+    upi: str,
+    *,
+    identifier: Optional[str] = None,
+    size: int = 500,
+    fields: Optional[str] = None,
+    db_types: Optional[Iterable[str]] = None,
+    active: Optional[bool] = None,
+    taxon_ids: Optional[Iterable[int]] = None,
+  ) -> Iterator[UniParcCrossReferencePage]:
+    """Yield every paginated database-reference page for one UPI."""
+    page = self.get_uniparc_cross_reference_page(
+      upi,
+      identifier=identifier,
+      size=size,
+      fields=fields,
+      db_types=db_types,
+      active=active,
+      taxon_ids=taxon_ids,
+    )
+    while True:
+      yield page
+      if page.next_url is None:
+        return
+      page = self.get_uniparc_cross_reference_page(url=page.next_url)
 
   def reference_proteomes(
     self, taxon_id: int, scope: str = "lineage", *, size: int = 500
@@ -630,6 +845,53 @@ class UniProtClient:
     if not isinstance(job_id, str) or not job_id:
       raise ValueError("job must be a nonempty job ID or ID Mapping domain value")
     return job_id
+
+  @staticmethod
+  def _uniparc_reference_params(
+    *,
+    db_types: Optional[Iterable[str]],
+    active: Optional[bool],
+    taxon_ids: Optional[Iterable[int]],
+  ) -> dict[str, str]:
+    params: dict[str, str] = {}
+    if db_types is not None:
+      if isinstance(db_types, (str, bytes)):
+        raise TypeError("db_types must be an iterable of names")
+      values = tuple(db_types)
+      if not values or len(values) > 50:
+        raise ValueError("db_types must contain between 1 and 50 names")
+      if any(
+        not isinstance(value, str) or not value or "," in value
+        for value in values
+      ):
+        raise ValueError(
+          "each database type must be a nonempty string without commas"
+        )
+      params["dbTypes"] = ",".join(values)
+    if active is not None:
+      if not isinstance(active, bool):
+        raise TypeError("active must be a boolean")
+      params["active"] = "true" if active else "false"
+    if taxon_ids is not None:
+      if isinstance(taxon_ids, (str, bytes)):
+        raise TypeError("taxon_ids must be an iterable of integers")
+      values = tuple(taxon_ids)
+      if not values or len(values) > 100:
+        raise ValueError("taxon_ids must contain between 1 and 100 IDs")
+      if any(
+        isinstance(value, bool) or not isinstance(value, int) or value < 1
+        for value in values
+      ):
+        raise ValueError("each taxon ID must be a positive integer")
+      params["taxonIds"] = ",".join(str(value) for value in values)
+    return params
+
+  def _uniparc_url(self, upi: str) -> str:
+    if not isinstance(upi, str) or not upi.strip():
+      raise ValueError("upi must not be empty")
+    return "{}/uniparc/{}".format(
+      self.base_url, quote(upi.strip(), safe="")
+    )
 
   def _entry_url(self, accession: str, format: str) -> str:
     if not isinstance(accession, str) or not accession.strip():

@@ -8,6 +8,9 @@ from .client import (
   TextResponse,
   TaxonPage,
   TaxonResponse,
+  UniParcCrossReferencePage,
+  UniParcEntryPage,
+  UniParcEntryResponse,
   UniProtClient,
   UniProtError,
   UniProtHTTPError,
@@ -45,6 +48,7 @@ from .proteomes import (
 )
 from .release import ReleaseMismatchError, UniProtRelease
 from .taxonomy import Taxon
+from .uniparc import UniParcCrossReference, UniParcEntry
 from .version import __version__
 
 __all__ = [
@@ -73,6 +77,11 @@ __all__ = [
   "TaxonPage",
   "TaxonResponse",
   "SelectionResult",
+  "UniParcCrossReference",
+  "UniParcCrossReferencePage",
+  "UniParcEntry",
+  "UniParcEntryPage",
+  "UniParcEntryResponse",
   "UniProtClient",
   "UniProtEntry",
   "UniProtRelease",

@@ -53,12 +53,20 @@ Primary references:
 - Mapping flow: submit `POST /idmapping/run`, poll `/idmapping/status/{jobId}`, read the authoritative redirect from `/idmapping/details/{jobId}`, then consume paginated result links (or explicitly choose stream). Polling must handle the service's 303 redirect behavior.
 - Results are either simple `{from,to}` pairs or enriched target objects. Preserve failed IDs, warnings, response metadata, and the seven-day job expiry.
 
+### UniParc
+
+- A UPI identifies one exact amino-acid sequence irrespective of source database or organism. It has no intrinsic single organism; organism and proteome provenance belong to each source cross-reference, and identical sequences from multiple taxa share a UPI.
+- Current full JSON is substantially richer than a bare ID/sequence pair: ordered active and inactive heterogeneous cross-references, source versions/dates/names, organisms, proteomes, sequence checksums, UniProtKB exclusion reason, and mapped signature/InterPro sequence features. Light/search JSON carries smaller aggregates and can optionally project organisms, names, and proteomes.
+- Public resources include full and light entry retrieval, paginated search, stream, and paginated/streamed database references. This client uses full/light JSON and FASTA plus resumable paginated search/xrefs; hidden exact-sequence/accession compatibility routes and duplicated proteome download are deliberately excluded.
+- Search supports UPI/accession/isoform, proteome, direct-organism and lineage taxonomy, gene/protein, source database/status, checksum, length ranges, source IDs, and feature IDs. Cursor URLs are opaque. Full/xref filters use comma-separated `dbTypes` (up to 50), exact `taxonIds` (up to 100), optional active status, and exact xref ID.
+- Full and light documents must not overwrite one another implicitly in persistence. UniParc therefore remains a client/domain surface until a dedicated store with explicit projection/merge semantics is designed; it is not inserted into the UniProtKB `entries` table.
+
 ## Architecture decision
 
 Use five narrow layers:
 
 1. **`UniProtClient` transport** — endpoint construction, pooled HTTP, timeouts/retries, response errors, release metadata, cursor pagination, and streaming downloads. It returns transport responses/pages; it never writes SQLite or chooses a proteome.
-2. **UniProt-native domain objects** — `UniProtEntry`, `Proteome`, `Taxon`, mapping jobs/results, and small response metadata/value objects. `UniProtEntry` retains the complete raw JSON document while exposing memoized convenience accessors for accession, canonical accession, isoform status, reviewed state, sequence, names, genes, organism/taxon, PE, versions, features, comments, xrefs, keywords, and evidence-bearing structures. Unknown fields and tagged-union variants survive round-trip.
+2. **UniProt-native domain objects** — `UniProtEntry`, `UniParcEntry`, `Proteome`, `Taxon`, mapping jobs/results, and small response metadata/value objects. Each rich resource retains the complete raw JSON document while exposing tolerant convenience accessors; unknown fields and tagged-union variants survive round-trip. UniParc cross-reference organism/proteome/status/version provenance is never flattened into a synthetic single protein identity.
 3. **`UniProtStore`** — a release-aware SQLite store. It persists the rich nested entry data as JSON, plus a deliberately small indexed projection for real lookups. It does not normalize every nested subtype into relational tables.
 4. **`UniProtRelease` handle/cache** — the ergonomic entry point, identified by release string and cache directory. Cache root precedence is explicit argument, `UNIPROTPY_CACHE_DIR`, then the platform user cache directory. It downloads/installs lazily, records source query/URL and release headers, and exposes memoized store-backed accessors.
 5. **Thin policies/interfaces** — a pure `ProteomeSelector`, CLI commands, and serializers call the layers above. No constructor performs network or filesystem I/O.
@@ -161,7 +169,8 @@ Live API checks are smoke tests only; deterministic tests use captured fixtures 
 - Verification: 21 focused offline tests pass. A live `P04637` JSON/FASTA fetch round-tripped through SQLite with a successful `TP53` lookup; live `UP000005640` metadata returned taxon 9606 and BUSCO 99.0 on release `2026_02`.
 - Redesigned CLI: complete. Includes entry JSON/FASTA/selected-TSV fetch, entry/proteome installation, cached accession/gene/name/proteome/all queries, faithful raw JSON, deterministic cached FASTA, explicit selected TSV fields, and UTF-8 file/stdout destinations. Focused offline verification passes 13 tests.
 - Taxonomy, ID Mapping, and repository cutover: complete in `2d986a0`. Includes faithful taxonomy domains and merged-ID handling, taxonomy pagination, capability-discovered mapping validation, one-shot form submission, redirect-safe polling, authoritative-details result pagination, raw diagnostics/metadata retention, explicit external FASTA artifacts, stateless proteome selection, and removal of legacy direct-request/flat-schema/path shims. Focused offline coverage passes across taxonomy, mapping, parser, store, proteome, transport, cache, and CLI behavior.
+- UniParc client/domain pipeline: complete. Includes faithful full/light documents, sequence/checksum/date/feature projections, provenance-preserving active/inactive database references, public FASTA retrieval, cursor-paginated query and xref traversal, source-verified xref filters, and explicit exclusion of hidden compatibility endpoints and unsafe UniProtKB-store reuse. Focused offline verification passes 40 UniParc tests plus 58 affected regressions.
 
 ## Next step
 
-No further implementation milestone is committed. Future taxonomy or ID Mapping CLI/storage work should be scoped explicitly and continue to preserve raw source documents, response metadata, opaque cursors, mapping diagnostics, and the clean client/domain/release boundaries shipped above.
+No further implementation milestone is committed. Future UniParc persistence/CLI work or taxonomy and ID Mapping CLI/storage work should be scoped explicitly and continue to preserve raw source documents, response metadata, opaque cursors, source provenance, mapping diagnostics, and the clean client/domain/release boundaries shipped above.

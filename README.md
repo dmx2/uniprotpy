@@ -101,6 +101,37 @@ print(result.results, result.failed_ids, result.warnings)
 
 Taxonomy entry retrieval preserves merged-taxonomy `303` bodies and redirect metadata; reference-proteome discovery resolves merged IDs before querying. Taxonomy search and ID Mapping results follow opaque absolute cursor links verbatim. ID Mapping submission is never retried, status polling does not auto-follow the service's `303`, and result retrieval uses the authoritative details redirect while preserving failed IDs, warnings, enriched targets, raw payloads, and response metadata. `wait_for_mapping` is synchronous polling over UniProt's server-asynchronous job API.
 
+## UniParc
+
+```python
+from uniprotpy import UniProtClient
+
+client = UniProtClient()
+
+full = client.get_uniparc_entry("UPI000002ED67").entry
+print(full.sequence, full.crc64)
+for reference in full.organism_cross_references:
+    print(reference.database, reference.identifier, reference.active, reference.organism)
+
+light = client.get_uniparc_entry_light(
+    "UPI000002ED67", fields="upi,length,checksum,organism"
+).entry
+pages = client.search_uniparc_entries(
+    "organism_id:9606 AND length:[300 TO 500]", size=500
+)
+xref_pages = client.uniparc_cross_references(
+    "UPI000002ED67",
+    db_types=["UniProtKB/Swiss-Prot"],
+    active=True,
+    taxon_ids=[9606],
+)
+fasta = client.get_uniparc_entry_text("UPI000002ED67", "fasta").text
+```
+
+A UPI identifies one exact amino-acid sequence, not one organism or one curated protein function. Identical sequences from multiple organisms share a UPI. Full records preserve the ordered heterogeneous source references—including inactive history, versions, organism and proteome provenance, source names, sequence features, checksums, and dates. Light/search records expose smaller server-computed aggregates such as common taxons, UniProtKB accessions, and optionally organisms/names/proteomes. Search and database-reference pagination follow opaque absolute cursor links verbatim.
+
+UniParc support is currently a client/domain surface, not a `UniProtRelease` cache or cached CLI query. Persisting full and light documents safely requires a dedicated UniParc table/store with explicit non-destructive merge semantics; they are not forced into the UniProtKB entry schema.
+
 ## External FASTA artifacts
 
 ```python
@@ -116,6 +147,6 @@ The three explicit source functions never guess whether a string is a path or li
 
 ## Current scope
 
-Shipped: rich entry JSON and FASTA retrieval, resilient cursor pagination, lossless entry/proteome/taxonomy domains, release-scoped SQLite caching, indexed accession/gene/name queries, proteome metadata/discovery/selection, merged-taxon canonicalization, bulk proteome installation, asynchronous-service ID Mapping discovery/submit/poll/paginated results, explicit external FASTA parsing, and the entry/install/cached-query CLI with faithful JSON/FASTA/selected-TSV output.
+Shipped: rich UniProtKB and UniParc JSON/FASTA retrieval, resilient cursor pagination, lossless entry/UniParc/proteome/taxonomy domains, release-scoped UniProtKB SQLite caching, indexed accession/gene/name queries, UniParc light/full and filtered database-reference queries, proteome metadata/discovery/selection, merged-taxon canonicalization, bulk proteome installation, asynchronous-service ID Mapping discovery/submit/poll/paginated results, explicit external FASTA parsing, and the entry/install/cached-query CLI with faithful JSON/FASTA/selected-TSV output.
 
 The exploratory direct-request helpers, lossy flat FASTA entry schema, stateful selector wrapper, compatibility database/selector spellings, unbounded taxonomy tree utility, silent output modes, and hard-coded output destinations have been removed.
