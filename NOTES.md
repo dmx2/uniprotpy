@@ -160,7 +160,8 @@ Live API checks are smoke tests only; deterministic tests use captured fixtures 
 - Proteome pipeline: complete in `c4df80f`. Includes faithful proteome metadata, exact/lineage reference discovery, typed ambiguity-preserving selection, and cursor-paginated bulk install with membership/provenance.
 - Verification: 21 focused offline tests pass. A live `P04637` JSON/FASTA fetch round-tripped through SQLite with a successful `TP53` lookup; live `UP000005640` metadata returned taxon 9606 and BUSCO 99.0 on release `2026_02`.
 - Redesigned CLI: complete. Includes entry JSON/FASTA/selected-TSV fetch, entry/proteome installation, cached accession/gene/name/proteome/all queries, faithful raw JSON, deterministic cached FASTA, explicit selected TSV fields, and UTF-8 file/stdout destinations. Focused offline verification passes 13 tests.
+- Taxonomy, ID Mapping, and repository cutover: complete in `2d986a0`. Includes faithful taxonomy domains and merged-ID handling, taxonomy pagination, capability-discovered mapping validation, one-shot form submission, redirect-safe polling, authoritative-details result pagination, raw diagnostics/metadata retention, explicit external FASTA artifacts, stateless proteome selection, and removal of legacy direct-request/flat-schema/path shims. Focused offline coverage passes across taxonomy, mapping, parser, store, proteome, transport, cache, and CLI behavior.
 
 ## Next step
 
-Add taxonomy domain objects, then the asynchronous ID-Mapping submit/poll/paginated-results flow already researched above. The redesigned CLI is shipped; keep future commands over the same client/release/domain boundaries.
+No further implementation milestone is committed. Future taxonomy or ID Mapping CLI/storage work should be scoped explicitly and continue to preserve raw source documents, response metadata, opaque cursors, mapping diagnostics, and the clean client/domain/release boundaries shipped above.

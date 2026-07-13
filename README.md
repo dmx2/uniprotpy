@@ -76,8 +76,46 @@ Taxonomy-based proteome searches are lineage-aware. Exact scope filters descenda
 
 Proteome installation uses cursor-paginated UniProtKB bulk search and persists rich entry JSON, proteome membership, release metadata, and provenance. It does not issue one direct request per protein.
 
+## Taxonomy and ID Mapping
+
+```python
+from uniprotpy import UniProtClient
+
+client = UniProtClient()
+
+taxon = client.get_taxon(9606).taxon
+print(taxon.scientific_name, taxon.lineage)
+
+# Mapping capabilities and valid pairs are discovered from UniProt, not hard-coded.
+configuration = client.get_id_mapping_configuration()
+job = client.submit_id_mapping(
+    "Gene_Name",
+    "UniProtKB",
+    ["TP53", "BRCA1"],
+    taxon_id=9606,
+    configuration=configuration,
+)
+result = client.wait_for_mapping(job)
+print(result.results, result.failed_ids, result.warnings)
+```
+
+Taxonomy entry retrieval preserves merged-taxonomy `303` bodies and redirect metadata; reference-proteome discovery resolves merged IDs before querying. Taxonomy search and ID Mapping results follow opaque absolute cursor links verbatim. ID Mapping submission is never retried, status polling does not auto-follow the service's `303`, and result retrieval uses the authoritative details redirect while preserving failed IDs, warnings, enriched targets, raw payloads, and response metadata. `wait_for_mapping` is synchronous polling over UniProt's server-asynchronous job API.
+
+## External FASTA artifacts
+
+```python
+from uniprotpy import parse_fasta_handle, parse_fasta_path, parse_fasta_text
+
+path_records = parse_fasta_path("proteins.fasta")
+text_records = parse_fasta_text(">P12345 example\nMPEPTIDE\n")
+with open("proteins.fasta", encoding="utf-8") as handle:
+    handle_records = parse_fasta_handle(handle)
+```
+
+The three explicit source functions never guess whether a string is a path or literal FASTA. They return `FastaRecord` artifacts without inventing missing UniProt annotations. Rich `UniProtEntry` JSON remains the authoritative entry model.
+
 ## Current scope
 
-Shipped: rich entry JSON and FASTA retrieval, resilient cursor pagination, lossless domain objects, release-scoped SQLite caching, indexed accession/gene/name queries, proteome metadata/discovery/selection, bulk proteome installation, and the entry/install/cached-query CLI with faithful JSON/FASTA/selected-TSV output.
+Shipped: rich entry JSON and FASTA retrieval, resilient cursor pagination, lossless entry/proteome/taxonomy domains, release-scoped SQLite caching, indexed accession/gene/name queries, proteome metadata/discovery/selection, merged-taxon canonicalization, bulk proteome installation, asynchronous-service ID Mapping discovery/submit/poll/paginated results, explicit external FASTA parsing, and the entry/install/cached-query CLI with faithful JSON/FASTA/selected-TSV output.
 
-Not yet shipped: taxonomy domain objects and asynchronous ID Mapping. See `NOTES.md` for the researched contracts and implementation plan.
+The exploratory direct-request helpers, lossy flat FASTA entry schema, stateful selector wrapper, compatibility database/selector spellings, unbounded taxonomy tree utility, silent output modes, and hard-coded output destinations have been removed.
