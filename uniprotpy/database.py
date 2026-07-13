@@ -25,7 +25,7 @@ from sqlalchemy.engine import URL
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
-from uniprotpy import models as _models
+from .models import UniProtEntry
 
 
 class _StoreBase(DeclarativeBase):
@@ -140,9 +140,6 @@ def _value(value: Any) -> Optional[str]:
 
 
 def _primary_protein_name(raw: Mapping[str, Any]) -> Optional[str]:
-  legacy = raw.get("protein_name")
-  if isinstance(legacy, str):
-    return legacy
   description = raw.get("proteinDescription")
   if not isinstance(description, Mapping):
     return None
@@ -184,9 +181,6 @@ def _gene_names(raw: Mapping[str, Any]) -> list[tuple[str, str, int]]:
           name = _value(item)
           if name:
             result.append((name, kind, len(result)))
-  legacy = raw.get("gene")
-  if not result and isinstance(legacy, str) and legacy:
-    result.append((legacy, "primary", 0))
   return result
 
 
@@ -204,7 +198,7 @@ def _int_value(value: Any) -> Optional[int]:
 
 
 def _projections(raw: Mapping[str, Any]) -> tuple[dict[str, Any], list[tuple[str, str, int]]]:
-  accession = raw.get("primaryAccession", raw.get("protein_id"))
+  accession = raw.get("primaryAccession")
   if not isinstance(accession, str) or not accession:
     raise ValueError("UniProt entry has no primary accession")
   canonical = raw.get("canonicalAccession")
@@ -214,7 +208,7 @@ def _projections(raw: Mapping[str, Any]) -> tuple[dict[str, Any], list[tuple[str
   primary_gene = next((name for name, kind, _ in names if kind == "primary"), None)
   protein_name = _primary_protein_name(raw)
   organism = raw.get("organism")
-  taxon_id = organism.get("taxonId") if isinstance(organism, Mapping) else raw.get("taxon_id")
+  taxon_id = organism.get("taxonId") if isinstance(organism, Mapping) else None
   audit = raw.get("entryAudit")
   audit = audit if isinstance(audit, Mapping) else {}
   sequence = raw.get("sequence")
@@ -223,16 +217,14 @@ def _projections(raw: Mapping[str, Any]) -> tuple[dict[str, Any], list[tuple[str
     sequence_length = sequence.get("length")
     sequence_checksum = sequence.get("crc64") or sequence.get("md5")
   else:
-    sequence_value = sequence if isinstance(sequence, str) else None
-    sequence_length = len(sequence_value) if sequence_value is not None else None
+    sequence_value = None
+    sequence_length = None
     sequence_checksum = None
   entry_type = raw.get("entryType")
   reviewed = None
   if isinstance(entry_type, str):
     reviewed = "unreviewed" not in entry_type.casefold() and "reviewed" in entry_type.casefold()
-  elif isinstance(raw.get("reviewed"), bool):
-    reviewed = raw["reviewed"]
-  existence = raw.get("proteinExistence", raw.get("pe_level"))
+  existence = raw.get("proteinExistence")
   return ({
     "accession": accession,
     "canonical_accession": canonical,
@@ -244,7 +236,7 @@ def _projections(raw: Mapping[str, Any]) -> tuple[dict[str, Any], list[tuple[str
     "taxon_id": _int_value(taxon_id),
     "protein_existence": str(existence) if existence is not None else None,
     "entry_version": _int_value(audit.get("entryVersion")),
-    "sequence_version": _int_value(audit.get("sequenceVersion", raw.get("sequence_version"))),
+    "sequence_version": _int_value(audit.get("sequenceVersion")),
     "sequence": sequence_value if isinstance(sequence_value, str) else None,
     "sequence_length": _int_value(sequence_length),
     "sequence_checksum": sequence_checksum if isinstance(sequence_checksum, str) else None,
@@ -265,15 +257,8 @@ def _entry_mapping(entry: Any) -> dict[str, Any]:
   return deepcopy(dict(raw))
 
 
-def _domain_entry(raw: Mapping[str, Any]) -> Any:
-  entry_type = getattr(_models, "UniProtEntry", None)
-  if entry_type is not None:
-    factory = getattr(entry_type, "from_json", None)
-    if callable(factory):
-      return factory(deepcopy(dict(raw)))
-    return entry_type(deepcopy(dict(raw)))
-  legacy_type = getattr(_models, "UniprotEntry")
-  return legacy_type(**deepcopy(dict(raw)))
+def _domain_entry(raw: Mapping[str, Any]) -> UniProtEntry:
+  return UniProtEntry.from_json(deepcopy(dict(raw)))
 
 
 class UniProtStore:
@@ -610,24 +595,5 @@ class UniProtStore:
     self.close()
 
 
-class UniprotDatabase(UniProtStore):
-  """Compatibility spelling and constructor for the original database class."""
 
-  def __init__(
-    self,
-    species: Optional[str] = None,
-    proteome_id: Optional[str] = None,
-    database_path: Optional[Union[str, Path, URL]] = None,
-    **kwargs: Any,
-  ) -> None:
-    if database_path is None and proteome_id is None and species is not None:
-      database_path = species
-      species = None
-    self.species = species
-    self.proteome_id = proteome_id
-    super().__init__(database_path=database_path, **kwargs)
-
-
-UniProtDatabase = UniprotDatabase
-
-__all__ = ["UniProtStore", "UniprotDatabase", "UniProtDatabase"]
+__all__ = ["UniProtStore"]

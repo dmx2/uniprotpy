@@ -6,13 +6,33 @@ from .client import (
   ProteomePage,
   ProteomeResponse,
   TextResponse,
+  TaxonPage,
+  TaxonResponse,
   UniProtClient,
   UniProtError,
   UniProtHTTPError,
   UniProtResponseError,
 )
-from .database import UniProtDatabase, UniProtStore, UniprotDatabase
+from .idmapping import (
+  IDMappingConfiguration,
+  IDMappingDetails,
+  IDMappingField,
+  IDMappingJob,
+  IDMappingMatch,
+  IDMappingPage,
+  IDMappingResult,
+  IDMappingRule,
+  IDMappingStatus,
+)
+from .database import UniProtStore
 from .models import UniProtEntry
+from .parser import (
+  FastaRecord,
+  format_fasta,
+  parse_fasta_handle,
+  parse_fasta_path,
+  parse_fasta_text,
+)
 from .proteomes import (
   Ambiguous,
   NotFound,
@@ -21,16 +41,26 @@ from .proteomes import (
   SelectionResult,
   Unique,
   select_highest_busco,
-  select_highest_busco_proteome,
   select_proteome,
 )
 from .release import ReleaseMismatchError, UniProtRelease
+from .taxonomy import Taxon
 from .version import __version__
 
 __all__ = [
   "Ambiguous",
   "EntryPage",
   "EntryResponse",
+  "FastaRecord",
+  "IDMappingConfiguration",
+  "IDMappingDetails",
+  "IDMappingField",
+  "IDMappingJob",
+  "IDMappingMatch",
+  "IDMappingPage",
+  "IDMappingResult",
+  "IDMappingRule",
+  "IDMappingStatus",
   "ProteomeSelector",
   "NotFound",
   "Proteome",
@@ -39,9 +69,11 @@ __all__ = [
   "ReleaseMismatchError",
   "ResponseMetadata",
   "TextResponse",
+  "Taxon",
+  "TaxonPage",
+  "TaxonResponse",
   "SelectionResult",
   "UniProtClient",
-  "UniProtDatabase",
   "UniProtEntry",
   "UniProtRelease",
   "UniProtError",
@@ -49,10 +81,12 @@ __all__ = [
   "UniProtResponseError",
   "UniProtStore",
   "Unique",
-  "UniprotDatabase",
+  "format_fasta",
+  "parse_fasta_handle",
+  "parse_fasta_path",
+  "parse_fasta_text",
   "resolve_cache_dir",
   "select_highest_busco",
-  "select_highest_busco_proteome",
   "select_proteome",
   "__version__",
 ]

@@ -194,25 +194,29 @@ def select_highest_busco(
   return Ambiguous(finalists)
 
 
-select_highest_busco_proteome = select_highest_busco
 
 
 class ProteomeSelector:
-  """Thin, I/O-free compatibility wrapper around the selection functions."""
+  """Pure candidate selection with no constructor I/O or retained state."""
 
-  def __init__(self, proteomes: Iterable[Proteome], taxon_id: Optional[int] = None):
-    self.proteomes = _candidates(proteomes)
-    self.taxon_id = taxon_id
+  def select(
+    self,
+    proteomes: Iterable[Proteome],
+    *,
+    taxon_id: Optional[int] = None,
+  ) -> SelectionResult:
+    return select_proteome(proteomes, taxon_id=taxon_id)
 
-  def select(self) -> SelectionResult:
-    return select_proteome(self.proteomes, taxon_id=self.taxon_id)
-
-  def select_highest_busco(self) -> SelectionResult:
-    return select_highest_busco(self.proteomes, taxon_id=self.taxon_id)
+  def select_highest_busco(
+    self,
+    proteomes: Iterable[Proteome],
+    *,
+    taxon_id: Optional[int] = None,
+  ) -> SelectionResult:
+    return select_highest_busco(proteomes, taxon_id=taxon_id)
 
 
 __all__ = [
   "Ambiguous", "NotFound", "Proteome", "ProteomeSelector", "SelectionResult",
-  "Unique", "select_highest_busco", "select_highest_busco_proteome",
-  "select_proteome",
+  "Unique", "select_highest_busco", "select_proteome",
 ]

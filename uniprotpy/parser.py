@@ -1,56 +1,88 @@
-import re
+"""Explicit parsers for external FASTA artifacts.
+
+FASTA is not treated as an authoritative UniProt annotation document. Callers
+must state whether their source is a path, an open text handle, or literal text;
+string inputs are never guessed to be paths.
+"""
+
+from dataclasses import dataclass
+from io import StringIO
+from os import PathLike
+from pathlib import Path
+from typing import Any, Iterable, TextIO, Tuple, Union
+
 from Bio import SeqIO
-from Bio.SeqRecord import SeqRecord
 
 
-def parse_proteome(proteome_file) -> dict:
-    """Parse out a proteome FASTA file and return a protein dictionary    
-    Args:
-        proteome_file: path to a proteome file in FASTA format.
-        
-    Returns:
-        A dictionary mapping protein IDs to keyword-value pairs."""
-    proteome_dict = {}
-    for record in SeqIO.parse(proteome_file, "fasta"):
-        protein_data = parse_protein_record(record)
-        protein_id = protein_data["protein_id"]
-        proteome_dict[protein_id] = protein_data
-        proteome_dict[protein_id]["sequence"] = str(record.seq)
-    
-    return proteome_dict
+@dataclass(frozen=True)
+class FastaRecord:
+  """One external FASTA record without invented UniProt annotations."""
+
+  identifier: str
+  description: str
+  sequence: str
+
+  @property
+  def accession(self) -> str:
+    parts = self.identifier.split("|")
+    return parts[1] if len(parts) >= 3 and parts[1] else self.identifier
+
+  def to_fasta(self, line_width: int = 60) -> str:
+    if line_width < 1:
+      raise ValueError("line_width must be positive")
+    header = self.description or self.identifier
+    lines = [
+      self.sequence[offset:offset + line_width]
+      for offset in range(0, len(self.sequence), line_width)
+    ]
+    return ">{}\n{}\n".format(header, "\n".join(lines))
 
 
-def parse_protein_record(record: SeqRecord) -> dict:
-    """Parse a record from a FASTA file and return a list of the protein data.
-    Args:
-        record: Biopython SeqRecord of the protein entry.
-        
-    Returns:
-        A list of the protein data in the order of the regexes below."""
-    regexes = {
-        'protein_id': re.compile(r"\|([^|]*)\|"),     # between | and |
-        'protein_name': re.compile(r"\s(.+?)\sOS"),   # between space and space before OS
-        'species': re.compile(r"OS=(.+?)\sOX"),       # between OS= and space before OX
-        'taxon_id': re.compile(r"OX=(.+?)(\s|$)"),         # between OX= and space
-        'gene': re.compile(r"GN=(.+?)(\s|$)"),             # between GN= and space
-        'pe_level': re.compile(r"PE=(.+?)(\s|$)"),         # between PE= and space
-        'sequence_version': re.compile(r"SV=(.+?)(\s|$)"), # between SV= and space
-        'gene_priority': re.compile(r"GP=(.+?)(\s|$)"),    # between GP= and space
-    }
-    protein_data = {}
-    for key in regexes: # loop through compiled regexes to extract protein data
-        match = regexes[key].search(str(record.description))
-        
-        if match:
-            protein_data[key] = match.group(1)
-        else:
-            if key == 'protein_id':
-                protein_data[key] = str(record.id) # get record.id from FASTA header instead
-            elif key == 'sequence_version':
-                protein_data[key] = '1'
-            elif key in ['pe_level', 'gene_priority']:
-                protein_data[key] = '0' # zeros for integer columns
-            else:
-                protein_data[key] = ''  # empty strings for string columns
+def _parse(source: Any) -> Tuple[FastaRecord, ...]:
+  return tuple(
+    FastaRecord(
+      identifier=str(record.id),
+      description=str(record.description),
+      sequence=str(record.seq),
+    )
+    for record in SeqIO.parse(source, "fasta")
+  )
 
-    return protein_data
+
+def parse_fasta_path(path: Union[str, PathLike[str]]) -> Tuple[FastaRecord, ...]:
+  """Parse an explicitly path-valued FASTA source."""
+  if not isinstance(path, (str, PathLike)):
+    raise TypeError("path must be a string or path-like value")
+  with Path(path).expanduser().open(encoding="utf-8") as handle:
+    return _parse(handle)
+
+
+def parse_fasta_handle(handle: TextIO) -> Tuple[FastaRecord, ...]:
+  """Parse an explicitly supplied open text handle without closing it."""
+  if not callable(getattr(handle, "read", None)):
+    raise TypeError("handle must be a readable text handle")
+  return _parse(handle)
+
+
+def parse_fasta_text(text: str) -> Tuple[FastaRecord, ...]:
+  """Parse literal FASTA text; the string is never interpreted as a path."""
+  if not isinstance(text, str):
+    raise TypeError("text must be a string")
+  return _parse(StringIO(text))
+
+
+def format_fasta(records: Iterable[FastaRecord], line_width: int = 60) -> str:
+  """Serialize external FASTA records deterministically."""
+  values = tuple(records)
+  if any(not isinstance(record, FastaRecord) for record in values):
+    raise TypeError("records must contain only FastaRecord values")
+  return "".join(record.to_fasta(line_width=line_width) for record in values)
+
+
+__all__ = [
+  "FastaRecord",
+  "format_fasta",
+  "parse_fasta_handle",
+  "parse_fasta_path",
+  "parse_fasta_text",
+]

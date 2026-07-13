@@ -10,8 +10,7 @@ from uniprotpy.proteomes import (
   NotFound,
   Proteome,
   Unique,
-  select_highest_busco,
-  select_proteome,
+  ProteomeSelector,
 )
 
 
@@ -45,8 +44,8 @@ class FakeSession:
     self.calls = []
     self.headers = {}
 
-  def get(self, url, *, params=None, timeout=None):
-    self.calls.append((url, params, timeout))
+  def get(self, url, *, params=None, timeout=None, allow_redirects=True):
+    self.calls.append((url, params, timeout, allow_redirects))
     return self.responses.pop(0)
 
 
@@ -85,20 +84,25 @@ def test_proteome_json_round_trip_and_accessors_are_faithful():
   assert proteome.to_json() == load_document("proteome-human-primary.json")
 
 
-def test_selection_reports_unique_ambiguous_not_found_and_busco_ties_honestly():
+def test_selector_is_stateless_across_unique_ambiguous_missing_and_busco_calls():
   primary, alternate, descendant = proteomes()
+  selector = ProteomeSelector()
 
-  unique = select_proteome([primary], taxon_id=9606)
-  ambiguous = select_proteome([primary, alternate], taxon_id=9606)
-  missing = select_proteome([], taxon_id=9606)
-  tied = select_highest_busco([primary, alternate], taxon_id=9606)
-  highest = select_highest_busco([primary, descendant], taxon_id=9606)
+  unique = selector.select([primary], taxon_id=9606)
+  ambiguous = selector.select([primary, alternate], taxon_id=9606)
+  missing = selector.select([], taxon_id=63221)
+  tied = selector.select_highest_busco(
+    [primary, alternate], taxon_id=9606
+  )
+  highest = selector.select_highest_busco(
+    [primary, descendant], taxon_id=9606
+  )
 
   assert isinstance(unique, Unique)
   assert unique.proteome is primary
   assert isinstance(ambiguous, Ambiguous)
   assert ambiguous.candidates == (primary, alternate)
-  assert missing == NotFound(taxon_id=9606)
+  assert missing == NotFound(taxon_id=63221)
   assert isinstance(tied, Ambiguous)
   assert tied.candidates == (primary, alternate)
   assert isinstance(highest, Unique)
@@ -149,35 +153,90 @@ def test_proteome_cursor_pagination_follows_opaque_link_verbatim():
   assert session.calls[1][1] is None
 
 
-def test_reference_proteomes_distinguish_exact_taxon_from_lineage_results():
+def test_reference_proteomes_canonicalize_active_taxon_before_exact_selection():
   documents = [
     load_document("proteome-human-primary.json"),
     load_document("proteome-descendant.json"),
   ]
+  taxonomy_url = "https://rest.example/taxonomy/9606"
+  search_url = "https://rest.example/proteomes/search"
+  session = FakeSession([
+    FakeResponse(
+      taxonomy_url,
+      {"taxonId": 9606, "scientificName": "Homo sapiens", "active": True},
+      RELEASE_HEADERS,
+    ),
+    FakeResponse(
+      search_url,
+      {"results": documents},
+      {**RELEASE_HEADERS, "X-Total-Results": "2"},
+    ),
+  ])
+  client = UniProtClient(base_url="https://rest.example", session=session)
 
-  def client_for_scope():
-    return UniProtClient(
-      base_url="https://rest.example",
-      session=FakeSession([FakeResponse(
-        "https://rest.example/proteomes/search",
-        {"results": documents},
-        {**RELEASE_HEADERS, "X-Total-Results": "2"},
-      )]),
-    )
+  exact = client.reference_proteomes(9606, scope="exact")
 
-  lineage = client_for_scope().reference_proteomes(9606, scope="lineage")
-  exact = client_for_scope().reference_proteomes(9606, scope="exact")
-
-  assert [item.upid for item in lineage] == ["UP000005640", "UP000999902"]
   assert [item.upid for item in exact] == ["UP000005640"]
-  lineage_selection = select_proteome(lineage, taxon_id=9606)
-  exact_selection = select_proteome(exact, taxon_id=9606)
-  assert isinstance(lineage_selection, Ambiguous)
-  assert [item.upid for item in lineage_selection.candidates] == [
-    "UP000005640", "UP000999902"
+  selection = ProteomeSelector().select(exact, taxon_id=9606)
+  assert isinstance(selection, Unique)
+  assert selection.proteome.upid == "UP000005640"
+  assert session.calls == [
+    (taxonomy_url, {"format": "json"}, client.timeout, False),
+    (search_url, {
+      "query": "(taxonomy_id:9606) AND (proteome_type:REFERENCE)",
+      "format": "json",
+      "size": "500",
+    }, client.timeout, True),
   ]
-  assert isinstance(exact_selection, Unique)
-  assert exact_selection.proteome.upid == "UP000005640"
+
+
+def test_reference_proteomes_resolve_merged_taxon_before_canonical_query():
+  obsolete_taxon_id = 12345
+  taxonomy_url = "https://rest.example/taxonomy/{}".format(obsolete_taxon_id)
+  canonical_taxonomy_url = "https://rest.example/taxonomy/9606"
+  search_url = "https://rest.example/proteomes/search"
+  session = FakeSession([
+    FakeResponse(
+      taxonomy_url,
+      {
+        "taxonId": obsolete_taxon_id,
+        "scientificName": "Obsolete human taxon",
+        "active": False,
+        "inactiveReason": {
+          "inactiveReasonType": "MERGED",
+          "mergedTo": 9606,
+        },
+      },
+      RELEASE_HEADERS,
+    ),
+    FakeResponse(
+      canonical_taxonomy_url,
+      {"taxonId": 9606, "scientificName": "Homo sapiens", "active": True},
+      RELEASE_HEADERS,
+    ),
+    FakeResponse(
+      search_url,
+      {"results": [
+        load_document("proteome-human-primary.json"),
+        load_document("proteome-descendant.json"),
+      ]},
+      {**RELEASE_HEADERS, "X-Total-Results": "2"},
+    ),
+  ])
+  client = UniProtClient(base_url="https://rest.example", session=session)
+
+  exact = client.reference_proteomes(obsolete_taxon_id, scope="exact")
+
+  assert [item.upid for item in exact] == ["UP000005640"]
+  assert session.calls == [
+    (taxonomy_url, {"format": "json"}, client.timeout, False),
+    (canonical_taxonomy_url, {"format": "json"}, client.timeout, False),
+    (search_url, {
+      "query": "(taxonomy_id:9606) AND (proteome_type:REFERENCE)",
+      "format": "json",
+      "size": "500",
+    }, client.timeout, True),
+  ]
 
 
 def test_release_installs_two_page_proteome_with_membership_and_provenance(
@@ -242,7 +301,8 @@ def test_release_installs_two_page_proteome_with_membership_and_provenance(
   assert session.calls[2][0] == next_url
   assert session.calls[2][1] is None
   assert not any(
-    "/uniprotkb/P04637" in url for url, _params, _timeout in session.calls
+    "/uniprotkb/P04637" in url
+    for url, _params, _timeout, _allow_redirects in session.calls
   )
   release.close()
 
