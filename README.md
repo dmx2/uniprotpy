@@ -10,6 +10,18 @@ UniProtPy preserves the complete nested UniProtKB JSON document while adding con
 pip install uniprotpy
 ```
 
+## Development and releases
+
+The project uses [uv](https://docs.astral.sh/uv/) with one locked development environment:
+
+```bash
+uv sync --locked
+uv run pytest -q
+uv build
+```
+
+PyPI releases use the `PYPI_API_TOKEN` GitHub repository secret. The package version is read from `uniprotpy/version.py`; a GitHub Release tag must be `v` followed by that exact version. Publishing GitHub Release `v0.2` runs the full test suite, builds and checks the wheel and source distribution, smoke-tests the installed wheel and CLI, then uploads both artifacts to PyPI. The API token is exposed only to the upload step.
+
 ## Fetch an entry
 
 ```python

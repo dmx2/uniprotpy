@@ -27,6 +27,7 @@ from .models import UniProtEntry
 from .proteomes import Proteome
 from .taxonomy import Taxon
 from .uniparc import UniParcCrossReference, UniParcEntry
+from .version import __version__
 
 
 _DEFAULT_BASE_URL = "https://rest.uniprot.org"
@@ -170,7 +171,7 @@ class UniProtClient:
   def __init__(
     self,
     base_url: str = _DEFAULT_BASE_URL,
-    user_agent: str = "UniProtPy/0.0.1 (+https://github.com/danielmarrama/uniprotpy)",
+    user_agent: str = "UniProtPy/{} (+https://github.com/dmx2/uniprotpy)".format(__version__),
     timeout: Tuple[float, float] = (5.0, 30.0),
     max_retries: int = 3,
     backoff_factor: float = 0.5,
