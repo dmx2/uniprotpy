@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Dict, Mapping, Optional, Tuple
 
 
@@ -42,7 +43,7 @@ class IDMappingConfiguration:
 
   @property
   def raw(self) -> Mapping[str, Any]:
-    return self._data
+    return MappingProxyType(self._data)
 
   def to_dict(self) -> Dict[str, Any]:
     return deepcopy(self._data)
@@ -145,7 +146,7 @@ class IDMappingStatus:
 
   @property
   def raw(self) -> Mapping[str, Any]:
-    return self._data
+    return MappingProxyType(self._data)
 
   @property
   def status(self) -> Optional[str]:
@@ -182,7 +183,7 @@ class IDMappingDetails:
 
   @property
   def raw(self) -> Mapping[str, Any]:
-    return self._data
+    return MappingProxyType(self._data)
 
   def to_dict(self) -> Dict[str, Any]:
     return deepcopy(self._data)
@@ -236,7 +237,7 @@ class IDMappingMatch:
 
   @property
   def raw(self) -> Mapping[str, Any]:
-    return self._data
+    return MappingProxyType(self._data)
 
   def to_dict(self) -> Dict[str, Any]:
     return deepcopy(self._data)

@@ -83,3 +83,42 @@ def test_direct_isoform_projection_has_distinct_accession_and_canonical_parent()
   assert entry.sequence == document["sequence"]["value"]
   assert entry.to_dict() == document
   assert entry.to_dict()["futureIsoformProjection"] == {"preserve": ["unknown", 2]}
+
+
+def test_raw_and_data_expose_read_only_views(reviewed_document):
+  entry = UniProtEntry.from_json(reviewed_document)
+
+  assert entry.raw == reviewed_document
+  assert entry.data == reviewed_document
+
+  with pytest.raises(TypeError):
+    entry.raw["primaryAccession"] = "MUTATED"
+  with pytest.raises(TypeError):
+    entry.data["primaryAccession"] = "MUTATED"
+
+  emitted = entry.to_dict()
+  emitted["primaryAccession"] = "MUTATED"
+  assert entry.accession == "P04637"
+  assert entry.raw["primaryAccession"] == "P04637"
+
+
+def test_all_domain_models_return_read_only_raw_views():
+  from uniprotpy.proteomes import Proteome
+  from uniprotpy.taxonomy import Taxon
+  from uniprotpy.uniparc import UniParcCrossReference, UniParcEntry
+
+  entry = UniProtEntry.from_json({"primaryAccession": "P1"})
+  with pytest.raises(TypeError):
+    entry.raw["injected"] = 1
+  with pytest.raises(TypeError):
+    entry.data["injected"] = 1
+
+  for obj in (
+    Proteome.from_json({"id": "UP1"}),
+    Taxon.from_json({"taxonId": 9606}),
+    UniParcEntry.from_json({"uniParcId": "UPI1"}),
+    UniParcCrossReference.from_json({"id": "X1"}),
+  ):
+    for view in (obj.raw, obj.data, obj.raw_json):
+      with pytest.raises(TypeError):
+        view["injected"] = 1

@@ -514,3 +514,16 @@ def test_wait_times_out_while_job_remains_running_without_fetching_details(
 
   assert len(session.calls) == 1
   assert session.calls[0][1] == BASE_URL + "/idmapping/status/job-slow"
+
+
+def test_id_mapping_raw_accessors_are_read_only():
+  from uniprotpy import IDMappingMatch, IDMappingStatus
+
+  config = IDMappingConfiguration({"groups": []})
+  status = IDMappingStatus("job-1", {"jobStatus": "RUNNING"})
+  details = IDMappingDetails("job-1", {"from": "UniProtKB_AC-ID"})
+  match = IDMappingMatch({"from": "P1", "to": "P2"})
+
+  for obj in (config, status, details, match):
+    with pytest.raises(TypeError):
+      obj.raw["injected"] = 1

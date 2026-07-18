@@ -3,6 +3,7 @@
 from copy import deepcopy
 from dataclasses import dataclass
 from functools import cached_property
+from types import MappingProxyType
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple, Union
 
 
@@ -28,15 +29,15 @@ class Proteome:
 
   @property
   def raw(self) -> Mapping[str, Any]:
-    return self._data
+    return MappingProxyType(self._data)
 
   @property
   def data(self) -> Mapping[str, Any]:
-    return self._data
+    return MappingProxyType(self._data)
 
   @property
   def raw_json(self) -> Mapping[str, Any]:
-    return self._data
+    return MappingProxyType(self._data)
 
   def dict(self) -> Dict[str, Any]:
     return self.to_dict()

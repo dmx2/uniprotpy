@@ -3,6 +3,7 @@
 from copy import deepcopy
 from functools import cached_property
 import re
+from types import MappingProxyType
 from typing import Any, Dict, Iterable, Mapping, Optional, Tuple
 
 
@@ -63,15 +64,15 @@ class UniProtEntry:
 
   @property
   def raw(self) -> Mapping[str, Any]:
-    """The authoritative raw document; callers should treat it as read-only."""
-    return self._data
+    """A read-only view of the authoritative document; use ``to_dict`` to edit."""
+    return MappingProxyType(self._data)
 
   def dict(self) -> Dict[str, Any]:
     return self.to_dict()
 
   @property
   def data(self) -> Mapping[str, Any]:
-    return self._data
+    return MappingProxyType(self._data)
 
   def to_dict(self) -> Dict[str, Any]:
     return deepcopy(self._data)

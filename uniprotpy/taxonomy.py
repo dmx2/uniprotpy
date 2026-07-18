@@ -2,6 +2,7 @@
 
 from copy import deepcopy
 from functools import cached_property
+from types import MappingProxyType
 from typing import Any, Dict, Mapping, Optional, Tuple
 
 
@@ -23,14 +24,14 @@ class Taxon:
 
   @property
   def raw(self) -> Mapping[str, Any]:
-    return self._data
+    return MappingProxyType(self._data)
   @property
   def data(self) -> Mapping[str, Any]:
-    return self._data
+    return MappingProxyType(self._data)
 
   @property
   def raw_json(self) -> Mapping[str, Any]:
-    return self._data
+    return MappingProxyType(self._data)
 
   def dict(self) -> Dict[str, Any]:
     return self.to_dict()
