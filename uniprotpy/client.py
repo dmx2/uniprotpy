@@ -8,7 +8,7 @@ import json
 import random
 import re
 import time
-from typing import Any, Callable, Iterable, Iterator, Mapping, Optional, Tuple
+from typing import Any, Callable, Iterable, Iterator, Mapping, Optional, Tuple, TypeVar
 from urllib.parse import quote
 
 import requests
@@ -34,6 +34,8 @@ _DEFAULT_BASE_URL = "https://rest.uniprot.org"
 _RETRY_STATUSES = frozenset((429, 500, 502, 503, 504))
 _FORMAT = re.compile(r"^[A-Za-z0-9]+$")
 _NEXT_LINK = re.compile(r'<([^>]+)>\s*;\s*[^,]*\brel\s*=\s*["\']?next["\']?', re.I)
+
+_PageT = TypeVar("_PageT")
 
 
 @dataclass(frozen=True)
@@ -289,18 +291,18 @@ class UniProtClient:
     fields: Optional[str] = None,
     include_isoform: bool = False,
   ) -> Iterator[EntryPage]:
-    """Yield cursor pages, following every next link verbatim."""
-    page = self.get_search_page(
+    """Yield cursor pages, following every next link verbatim.
+
+    Arguments are validated eagerly: an invalid ``query`` or ``size`` raises
+    before any page is returned rather than on first iteration.
+    """
+    first = self.get_search_page(
       query,
       size=size,
       fields=fields,
       include_isoform=include_isoform,
     )
-    while True:
-      yield page
-      if page.next_url is None:
-        return
-      page = self.get_search_page(url=page.next_url)
+    return self._follow_pages(first, lambda url: self.get_search_page(url=url))
 
   def get_proteome(self, upid: str) -> ProteomeResponse:
     """Retrieve a faithful proteome JSON document and response metadata."""
@@ -356,13 +358,14 @@ class UniProtClient:
   def search_proteomes(
     self, query: str, *, size: int = 500
   ) -> Iterator[ProteomePage]:
-    """Yield every cursor-paginated proteome search page."""
-    page = self.get_proteome_search_page(query, size=size)
-    while True:
-      yield page
-      if page.next_url is None:
-        return
-      page = self.get_proteome_search_page(url=page.next_url)
+    """Yield every cursor-paginated proteome search page.
+
+    Arguments are validated eagerly, before the first page is returned.
+    """
+    first = self.get_proteome_search_page(query, size=size)
+    return self._follow_pages(
+      first, lambda url: self.get_proteome_search_page(url=url)
+    )
 
   def get_uniparc_entry(
     self,
@@ -460,15 +463,16 @@ class UniProtClient:
     fields: Optional[str] = None,
     sort: Optional[str] = None,
   ) -> Iterator[UniParcEntryPage]:
-    """Yield every cursor-paginated UniParc query page."""
-    page = self.get_uniparc_search_page(
+    """Yield every cursor-paginated UniParc query page.
+
+    Arguments are validated eagerly, before the first page is returned.
+    """
+    first = self.get_uniparc_search_page(
       query, size=size, fields=fields, sort=sort
     )
-    while True:
-      yield page
-      if page.next_url is None:
-        return
-      page = self.get_uniparc_search_page(url=page.next_url)
+    return self._follow_pages(
+      first, lambda url: self.get_uniparc_search_page(url=url)
+    )
 
   def get_uniparc_cross_reference_page(
     self,
@@ -535,8 +539,11 @@ class UniProtClient:
     active: Optional[bool] = None,
     taxon_ids: Optional[Iterable[int]] = None,
   ) -> Iterator[UniParcCrossReferencePage]:
-    """Yield every paginated database-reference page for one UPI."""
-    page = self.get_uniparc_cross_reference_page(
+    """Yield every paginated database-reference page for one UPI.
+
+    Arguments are validated eagerly, before the first page is returned.
+    """
+    first = self.get_uniparc_cross_reference_page(
       upi,
       identifier=identifier,
       size=size,
@@ -545,11 +552,9 @@ class UniProtClient:
       active=active,
       taxon_ids=taxon_ids,
     )
-    while True:
-      yield page
-      if page.next_url is None:
-        return
-      page = self.get_uniparc_cross_reference_page(url=page.next_url)
+    return self._follow_pages(
+      first, lambda url: self.get_uniparc_cross_reference_page(url=url)
+    )
 
   def reference_proteomes(
     self, taxon_id: int, scope: str = "lineage", *, size: int = 500
@@ -640,13 +645,14 @@ class UniProtClient:
     return TaxonPage(tuple(taxa), self._metadata(response), self._next_url(response))
 
   def search_taxa(self, query: str, *, size: int = 500) -> Iterator[TaxonPage]:
-    """Yield every cursor-paginated taxonomy search page."""
-    page = self.get_taxonomy_search_page(query, size=size)
-    while True:
-      yield page
-      if page.next_url is None:
-        return
-      page = self.get_taxonomy_search_page(url=page.next_url)
+    """Yield every cursor-paginated taxonomy search page.
+
+    Arguments are validated eagerly, before the first page is returned.
+    """
+    first = self.get_taxonomy_search_page(query, size=size)
+    return self._follow_pages(
+      first, lambda url: self.get_taxonomy_search_page(url=url)
+    )
 
   def get_id_mapping_configuration(self) -> IDMappingConfiguration:
     """Discover current mapping databases, valid pairs, and taxId support."""
@@ -782,7 +788,11 @@ class UniProtClient:
   def id_mapping_results(
     self, job: Any, *, size: int = 500
   ) -> Iterator[IDMappingPage]:
-    """Yield all paginated mapping results from the details redirect."""
+    """Yield all paginated mapping results from the details redirect.
+
+    Arguments and job details are validated eagerly, before the first page is
+    returned.
+    """
     if size < 1 or size > 500:
       raise ValueError("size must be between 1 and 500")
     details = job if isinstance(job, IDMappingDetails) else self.get_id_mapping_details(job)
@@ -791,12 +801,8 @@ class UniProtClient:
       raise UniProtResponseError(
         "UniProt ID Mapping details for {} have no redirectURL".format(details.job_id)
       )
-    page = self.get_id_mapping_page(url, size=size)
-    while True:
-      yield page
-      if page.next_url is None:
-        return
-      page = self.get_id_mapping_page(page.next_url)
+    first = self.get_id_mapping_page(url, size=size)
+    return self._follow_pages(first, self.get_id_mapping_page)
 
   def wait_for_mapping(
     self,
@@ -846,6 +852,17 @@ class UniProtClient:
     if not isinstance(job_id, str) or not job_id:
       raise ValueError("job must be a nonempty job ID or ID Mapping domain value")
     return job_id
+
+  @staticmethod
+  def _follow_pages(
+    first: _PageT, fetch_next: Callable[[str], _PageT]
+  ) -> Iterator[_PageT]:
+    page = first
+    while True:
+      yield page
+      if page.next_url is None:
+        return
+      page = fetch_next(page.next_url)
 
   @staticmethod
   def _uniparc_reference_params(

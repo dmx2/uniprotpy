@@ -1,6 +1,8 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from uniprotpy.client import UniProtClient
 
 
@@ -146,3 +148,17 @@ def test_search_follows_opaque_absolute_next_link_verbatim_and_preserves_totals(
   }
   assert session.calls[1][0] == next_url
   assert session.calls[1][1] is None
+
+
+def test_search_iterators_validate_arguments_eagerly():
+  session = FakeSession([])
+  client = UniProtClient(base_url="https://rest.example", session=session)
+
+  with pytest.raises(ValueError):
+    client.search_entries("")
+  with pytest.raises(ValueError):
+    client.search_proteomes("   ")
+  with pytest.raises(ValueError):
+    client.search_taxa("")
+
+  assert session.calls == []
