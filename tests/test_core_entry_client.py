@@ -162,3 +162,18 @@ def test_search_iterators_validate_arguments_eagerly():
     client.search_taxa("")
 
   assert session.calls == []
+
+
+def test_search_page_size_rejects_non_int_values():
+  session = FakeSession([])
+  client = UniProtClient(base_url="https://rest.example", session=session)
+
+  for bad in (True, 2.5, "5"):
+    with pytest.raises(ValueError):
+      client.get_search_page("q", size=bad)
+    with pytest.raises(ValueError):
+      client.get_proteome_search_page("q", size=bad)
+    with pytest.raises(ValueError):
+      client.get_taxonomy_search_page("q", size=bad)
+
+  assert session.calls == []

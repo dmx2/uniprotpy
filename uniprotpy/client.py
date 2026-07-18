@@ -254,7 +254,7 @@ class UniProtClient:
     else:
       if query is None or not query.strip():
         raise ValueError("query must not be empty")
-      if size < 1 or size > 500:
+      if isinstance(size, bool) or not isinstance(size, int) or not 1 <= size <= 500:
         raise ValueError("size must be between 1 and 500")
       params = {
         "query": query,
@@ -328,7 +328,7 @@ class UniProtClient:
     else:
       if query is None or not query.strip():
         raise ValueError("query must not be empty")
-      if size < 1 or size > 500:
+      if isinstance(size, bool) or not isinstance(size, int) or not 1 <= size <= 500:
         raise ValueError("size must be between 1 and 500")
       response = self._get(
         self.base_url + "/proteomes/search",
@@ -619,7 +619,7 @@ class UniProtClient:
     else:
       if query is None or not query.strip():
         raise ValueError("query must not be empty")
-      if size < 1 or size > 500:
+      if isinstance(size, bool) or not isinstance(size, int) or not 1 <= size <= 500:
         raise ValueError("size must be between 1 and 500")
       response = self._get(
         self.base_url + "/taxonomy/search",
